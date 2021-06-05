@@ -3,6 +3,12 @@ name: Rebuild TGUI
 on:
   issue_comment:
     types: [created]
+  push:
+    branches:
+      - 'master'
+    paths:
+      - 'tgui/**.js'
+      - 'tgui/**.scss'
 
 env:
   GITHUB_TOKEN: '${{ secrets.CL_TOKEN }}'
@@ -13,8 +19,9 @@ env:
   DEFAULT_BRANCH: 'master'
 
 jobs:
-  build:
-    name: TGUI Rebuild
+  odrebuild:
+    if: ${{ github.event_name == 'issue_comment' }}
+    name: TGUI On-Demand Rebuild
     runs-on: ubuntu-latest
     steps:
       - name: Check Comment
@@ -69,3 +76,29 @@ jobs:
         run: |
           git commit -m "TGUI Rebuild" -a || true
           git push
+
+  autorebuild:
+    if: ${{ github.event_name == 'push' }}
+    name: TGUI Automatic Rebuild
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+        with:
+          fetch-depth: 25
+      - name: Setup Node
+        uses: actions/setup-node@v1
+        with:
+          node-version: '>=12.13'
+      - name: Build TGUI
+        run: bin/tgui
+        working-directory: ./tgui
+      - name: Commit Artifacts
+        run: |
+          git config --local user.email "${{ env.COMMIT_EMAIL }}"
+          git config --local user.name "${{ env.COMMIT_NAME }}"
+          git pull origin ${{ env.DEFAULT_BRANCH }}
+          git commit -m "Automatic TGUI Rebuild [ci skip]" -a || true
+      - name: Push
+        run: |
+          git push "https://${{ env.GITHUB_USER }}:${{ env.GITHUB_TOKEN }}@github.com/${{ env.REPO_PATH }}.git"
